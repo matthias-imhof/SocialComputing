@@ -5,7 +5,7 @@ import os
 #curl -X POST 'https://www.picpurify.com/analyse/1.1' -F 'API_KEY=XXX' -F 'task=porn_moderation,drug_moderation,gore_moderation' -F 'origin_id=xxxxxxxxx' -F 'reference_id=yyyyyyyy' -F 'file_image=@/path/to/local/file.jpg'
 
 
-picpurify_api_keys = ['4hhAWQnp6qiA9jDwr5wlgw3XZb3y9DJK']
+picpurify_api_keys = ['4hhAWQnp6qiA9jDwr5wlgw3XZb3y9DJK', '9Vgra9ab0ic2EEkGIhuHlSiZ8XWr9UeL']
 
 picpurify_url = 'https://www.picpurify.com/analyse/1.1'
 
