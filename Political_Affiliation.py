@@ -1,40 +1,45 @@
-import csv
 import mysql.connector
 from mysql.connector import Error
 
 
-
-# fills up values only for users who are not yet in the DB
+# fills up values only for users wh     o are not yet in the DB
 def fillDataUser(cursor):
-    sql_baseQuery = """INSERT INTO users_pre_processed_political_affiliation VALUES (%s, %s, %s, %s, %s, %s, %s)"""
-    sql_checkQuery = """select id from users_pre_processed_political_affiliation WHERE id = %s"""
+    sql_baseQuery = """INSERT INTO users_pre_processed VALUES (%s, %s, %s, %s, %s, %s, %s)"""
+    #sql_checkQuery = """select id from users_pre_processed WHERE id = %s"""
 
     # depending on the size of the table needs to change
     cursor = connection.cursor()
-    cursor.execute("select id from users;")
+    cursor.execute("select id from users WHERE id NOT IN (SELECT id from users_pre_processed);")
+    # where
     record = cursor.fetchall()
 
     # go through all the rows of the user table
-    for row in record:
-        # get only the twitteruserid
-        userID = str(row).strip('(),')
-        # check if the user from the users table is in the users_pre_processed table
-        cursor.execute(sql_checkQuery, [userID])
-        userIDdb = cursor.fetchall()
-        if(len(userIDdb) > 0):
-            print('already processed user: ' + str(userID))
-            continue
-        else:
-            data = (str(row).strip('(),'), str(row).strip('(),'), -1 , -1, -1 , -1, -1)
-            cursor.execute(sql_baseQuery, data)
-    connection.commit()
+    # for row in record:
+    #     # get only the twitteruserid
+    #     userID = str(row).strip('(),')
+    #     # check if the user from the users table is in the users_pre_processed table
+    #     cursor.execute(sql_checkQuery, [userID])
+    #     userIDdb = cursor.fetchall()
+    #     if (len(userIDdb) > 0):
+    #         print('already processed user: ' + str(userID))
+    #         continue
+    #     else:
+    #         data = (str(row).strip('(),'), str(row).strip('(),'), -1, -1, -1, -1, -1)
+    #         cursor.execute(sql_baseQuery, data)
 
+
+    #userID = [str(row).strip('(),') for row in record]
+    #cursor.executemany(sql_checkQuery, userID)
+    data = [(str(row).strip('(),'), str(row).strip('(),'), -1, -1, -1, -1, -1) for row in record]
+    cursor.executemany(sql_baseQuery, data)
+
+    connection.commit()
 
 
 def getFollowersAffiliation(cursor):
     cursor = connection.cursor()
     # TODO: change to cursor.execute("select user_id,following_id from user_following;")
-    cursor.execute("select id,username from users;")
+    cursor.execute("select user_id,following_id from user_following;")
     # depending on the size of the table needs to change
     record = cursor.fetchall()
 
@@ -52,9 +57,9 @@ def getFollowersAffiliation(cursor):
     # load politician data from file into dict
     with open('US-Politicians-Twitter-Dataset.csv', 'r') as dataset:
         lines = dataset.readlines()
-    for idx,line in enumerate(lines):
+    for idx, line in enumerate(lines):
         # first row (header row with description can be dropped)
-        if(idx == 0):
+        if (idx == 0):
             continue
         # split each line with the , delimeter and have a list to easily select the witter userID [3] and political affiliation[10] also remove last linebreak
         temp = line.split(',')
@@ -62,12 +67,23 @@ def getFollowersAffiliation(cursor):
 
     # add followers of a userID to a list. The key being a specific twitter userID
     # only process twitter users which are not yet processed (i.e. have -1 in the political affiliation column)
-    sql_checkQuery = """select id from users_pre_processed_political_affiliation WHERE id = %s AND political_affiliation > -1"""
+    sql_checkQuery = """select id from users_pre_processed WHERE id = %s AND political_affiliation != -1"""
+
+    count = 0
     for row in record:
+        print(count)
+        count += 1
         if userFollowing.get(row[0]) is not None:
-            temp = userFollowing[row[0]]
-            temp.append(row[1])
-            userFollowing[row[0]] = temp
+            cursor.execute(sql_checkQuery, [row[0]])
+            userIDdb = cursor.fetchall()
+            if (len(userIDdb) > 0):
+                print('already processed user: ' + str(row[0]))
+                continue
+            else:
+                print('NOT YET PROCESSED USER: ' + str(row[0]) + " with following: " + str(row[1]))
+                temp = userFollowing[row[0]]
+                temp.append(row[1])
+                userFollowing[row[0]] = temp
         else:
             # twitter user is already processed and can be skipped will be determined based on the political affilian which is -1 if not proessed and otherwise greater
             cursor.execute(sql_checkQuery, [row[0]])
@@ -76,22 +92,26 @@ def getFollowersAffiliation(cursor):
                 print('already processed user: ' + str(row[0]))
                 continue
             else:
+                print('NOT YET PROCESSED USER: ' + str(row[0]) + " with following: " + str(row[1]))
                 userFollowing[row[0]] = [row[1]]
                 userFollowingRepublicans[row[0]] = 0
                 userFollowingDemocrats[row[0]] = 0
 
     # iterate through all users and it's followers and find out if following person is a politician from the dataset
+
     for userID in userFollowing:
-        for following in userFollowing[userID]:
-            if following in politicianDataset:
-                if (politicianDataset[following] == "Democratic Party"):
+        for followingID in userFollowing[userID]:
+            if str(followingID) in politicianDataset:
+                if (politicianDataset[str(followingID)] == "Democratic Party"):
                     userFollowingDemocrats[userID] += 1
-                elif (politicianDataset[following] == "Republican Party"):
+                elif (politicianDataset[str(followingID)] == "Republican Party"):
                     userFollowingRepublicans[userID] += 1
                 else:
                     continue
+            else:
+                continue
 
-    sql_updateQuery = """UPDATE users_pre_processed_political_affiliation SET political_affiliation = %s, democrat_following = %s, republican_following = %s, following_base = %s WHERE id = %s"""
+    sql_updateQuery = """UPDATE users_pre_processed SET political_affiliation = %s, democrat_following = %s, republican_following = %s, following_base = %s WHERE id = %s"""
 
     for userID in userFollowing:
         democrats = userFollowingDemocrats.get(userID)
@@ -100,30 +120,41 @@ def getFollowersAffiliation(cursor):
         # there can't be a devision by 0 error
         if ((democrats + republicans) < 5):
             polticalAffiliation[userID] = 0
-        elif(democrats > republicans):
+            continue
+        elif (democrats > republicans):
             if ((democrats) / (democrats + republicans) >= 0.6):
                 polticalAffiliation[userID] = 1
             else:
                 polticalAffiliation[userID] = 0
+            continue
         elif (republicans > democrats):
             if ((republicans) / (democrats + republicans) >= 0.6):
                 polticalAffiliation[userID] = 2
             else:
                 polticalAffiliation[userID] = 0
+            continue
         # if equal followers
         else:
             polticalAffiliation[userID] = 0
     # update records accordingly
+    print(userFollowing)
+    print(userFollowingDemocrats)
+    print(userFollowingRepublicans)
     print(polticalAffiliation)
     cursor = connection.cursor()
     # for idx, userID in enumerate(userFollowing):
-    #     data = (polticalAffiliation.get(userId), userFollowingDemocrats.get(userID), userFollowingRepublicans.get(userID), len(userFollowing.get(userID)), userID)
+    #     data = (polticalAffiliation.get(userID), userFollowingDemocrats.get(userID), userFollowingRepublicans.get(userID), len(userFollowing.get(userID)), userID)
     #     cursor.execute(sql_updateQuery, data)
-    # connection.commit()
+
+    data = [(polticalAffiliation.get(userID), userFollowingDemocrats.get(userID), userFollowingRepublicans.get(userID), len(userFollowing.get(userID)), userID) for userID in userFollowing]
+    cursor.executemany(sql_updateQuery, data)
+    connection.commit()
 
 
 if __name__ == "__main__":
     try:
+        # fs22-sc-test
+        # TestDB
         connection = mysql.connector.connect(host='s1.lgh.li',
                                              database='fs22-sc',
                                              user='fs22-sc',
@@ -132,7 +163,7 @@ if __name__ == "__main__":
             db_Info = connection.get_server_info()
             print("Connected to MySQL Server version ", db_Info)
             cursor = connection.cursor()
-            cursor.execute('''CREATE TABLE IF NOT EXISTS users_pre_processed_political_affiliation (
+            cursor.execute('''CREATE TABLE IF NOT EXISTS users_pre_processed (
                                    id BIGINT PRIMARY KEY,
                                    user_id BIGINT,
                                    gender INTEGER,
