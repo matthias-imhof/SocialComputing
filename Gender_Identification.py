@@ -22,12 +22,12 @@ picpurify_url = 'https://www.picpurify.com/analyse/1.1'
 
 
 def fill_data_user(cursor):
-    sql_baseQuery = """INSERT INTO users_pre_processed_gender_test VALUES (%s, %s, %s, %s, %s, %s, %s)"""
+    sql_baseQuery = """INSERT INTO users_pre_processed VALUES (%s, %s, %s, %s, %s, %s, %s)"""
 
     # depending on the size of the table needs to change
     cursor = connection.cursor()
     cursor.execute(
-        "SELECT DISTINCT author_id FROM tweets WHERE author_id NOT IN (SELECT id from users_pre_processed_gender_test);")
+        "SELECT DISTINCT author_id FROM tweets WHERE author_id NOT IN (SELECT id from users_pre_processed);")
     record = cursor.fetchall()
     data = [(str(row).strip('(),'), str(row).strip('(),'), "-1", "-1", "-1", "-1", "-1") for row in record]
     cursor.executemany(sql_baseQuery, data)
@@ -37,7 +37,7 @@ def fill_data_user(cursor):
 def sendQuery(cursor, query_string, data):
     cursor = connection.cursor()
     cursor.execute(
-        "SELECT author_id FROM tweets WHERE author_id NOT IN (SELECT id from users_pre_processed_gender_test);")
+        "SELECT author_id FROM tweets WHERE author_id NOT IN (SELECT id from users_pre_processed);")
     record = cursor.fetchall()
     cursor.executemany(query_string, data)
     connection.commit()
@@ -73,7 +73,7 @@ def get_classified_names():
 
 def get_users(db_connection):
     return pd.read_sql_query(
-        "SELECT DISTINCT users.id, users.username, users.name ,users.profile_picture_url FROM users INNER JOIN tweets AS t ON users.id = t.author_id INNER JOIN users_pre_processed_gender_test AS uppgt on users.id = uppgt.user_id WHERE gender = -1",
+        "SELECT DISTINCT users.id, users.username, users.name ,users.profile_picture_url FROM users INNER JOIN tweets AS t ON users.id = t.author_id INNER JOIN users_pre_processed AS uppgt on users.id = uppgt.user_id WHERE gender = -1",
         db_connection)
 
 
@@ -83,7 +83,7 @@ def identify_gender(db_connection):
 
     users_df = get_users(db_connection)
     gendered_names = dict(zip(get_classified_names()['Name'], get_classified_names()["Gender"]))
-    preprocessed_users = pd.read_sql_query("SELECT user_id, gender FROM users_pre_processed_gender_test", db_connection)
+    preprocessed_users = pd.read_sql_query("SELECT user_id, gender FROM users_pre_processed", db_connection)
     # print(preprocessed_users)
 
     indexes = []
@@ -114,7 +114,7 @@ def identify_gender(db_connection):
             url = user["profile_picture_url"]
             if url == "null":
                 continue
-            query_string = "UPDATE users_pre_processed_gender_test SET gender=%s WHERE id=%s"
+            query_string = "UPDATE users_pre_processed SET gender=%s WHERE id=%s"
             data.append((classify_gender_by_pic(url), int(users_df.iloc[index]["id"])))
             api_calls_count += 1
             # print("Identified by Picture")
@@ -122,7 +122,7 @@ def identify_gender(db_connection):
             # print("Cant identify")
             data.append(("0", int(users_df.iloc[index]["id"])))
         print("Processed {} of {}".format(count, len(users_df)))
-    query_string = "UPDATE users_pre_processed_gender_test SET gender=%s WHERE id=%s AND gender < 0"
+    query_string = "UPDATE users_pre_processed SET gender=%s WHERE id=%s AND gender < 0"
     sendQuery(cursor, query_string, data)
     df = pd.DataFrame({"id": indexes, "gender": result.values()})
 
@@ -172,7 +172,7 @@ if __name__ == "__main__":
             db_Info = connection.get_server_info()
             print("Connected to MySQL Server version ", db_Info)
             cursor = connection.cursor()
-            cursor.execute('''CREATE TABLE IF NOT EXISTS users_pre_processed_gender_test (
+            cursor.execute('''CREATE TABLE IF NOT EXISTS users_pre_processed (
                                    id BIGINT PRIMARY KEY,
                                    user_id BIGINT,
                                    gender VARCHAR(255),
