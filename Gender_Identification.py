@@ -165,7 +165,7 @@ def classify_gender_by_pic(picture_url):
 if __name__ == "__main__":
     try:
         connection = mysql.connector.connect(host='s1.lgh.li',
-                                             database='fs22-sc',
+                                             database='fs22-sc-prod',
                                              user='fs22-sc',
                                              password='FS22-SC-pw')
         if connection.is_connected():

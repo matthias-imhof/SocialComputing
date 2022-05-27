@@ -1,5 +1,6 @@
 import mysql.connector
 from mysql.connector import Error
+from tqdm import tqdm
 
 
 # fills up values only for users wh     o are not yet in the DB
@@ -57,7 +58,7 @@ def getFollowersAffiliation(cursor):
     # load politician data from file into dict
     with open('US-Politicians-Twitter-Dataset.csv', 'r') as dataset:
         lines = dataset.readlines()
-    for idx, line in enumerate(lines):
+    for idx, line in tqdm(enumerate(lines), desc='Load Politicians twitter ID into dict'):
         # first row (header row with description can be dropped)
         if (idx == 0):
             continue
@@ -69,18 +70,17 @@ def getFollowersAffiliation(cursor):
     # only process twitter users which are not yet processed (i.e. have -1 in the political affiliation column)
     sql_checkQuery = """select id from users_pre_processed WHERE id = %s AND political_affiliation != -1"""
 
-    count = 0
-    for row in record:
-        print(count)
-        count += 1
+
+    for row in tqdm(record, desc='Find following twitter user'):
+
         if userFollowing.get(row[0]) is not None:
             cursor.execute(sql_checkQuery, [row[0]])
             userIDdb = cursor.fetchall()
             if (len(userIDdb) > 0):
-                print('already processed user: ' + str(row[0]))
+                #print('already processed user: ' + str(row[0]))
                 continue
             else:
-                print('NOT YET PROCESSED USER: ' + str(row[0]) + " with following: " + str(row[1]))
+                #print('NOT YET PROCESSED USER: ' + str(row[0]) + " with following: " + str(row[1]))
                 temp = userFollowing[row[0]]
                 temp.append(row[1])
                 userFollowing[row[0]] = temp
@@ -89,17 +89,17 @@ def getFollowersAffiliation(cursor):
             cursor.execute(sql_checkQuery, [row[0]])
             userIDdb = cursor.fetchall()
             if (len(userIDdb) > 0):
-                print('already processed user: ' + str(row[0]))
+                #print('already processed user: ' + str(row[0]))
                 continue
             else:
-                print('NOT YET PROCESSED USER: ' + str(row[0]) + " with following: " + str(row[1]))
+                #print('NOT YET PROCESSED USER: ' + str(row[0]) + " with following: " + str(row[1]))
                 userFollowing[row[0]] = [row[1]]
                 userFollowingRepublicans[row[0]] = 0
                 userFollowingDemocrats[row[0]] = 0
 
     # iterate through all users and it's followers and find out if following person is a politician from the dataset
 
-    for userID in userFollowing:
+    for userID in tqdm(userFollowing, desc='Counting individual party'):
         for followingID in userFollowing[userID]:
             if str(followingID) in politicianDataset:
                 if (politicianDataset[str(followingID)] == "Democratic Party"):
@@ -113,7 +113,7 @@ def getFollowersAffiliation(cursor):
 
     sql_updateQuery = """UPDATE users_pre_processed SET political_affiliation = %s, democrat_following = %s, republican_following = %s, following_base = %s WHERE id = %s"""
 
-    for userID in userFollowing:
+    for userID in tqdm(userFollowing, desc='Political definition function'):
         democrats = userFollowingDemocrats.get(userID)
         republicans = userFollowingRepublicans.get(userID)
         # Do concrete affiliation calculation and define baseline 0.6
@@ -137,10 +137,10 @@ def getFollowersAffiliation(cursor):
         else:
             polticalAffiliation[userID] = 0
     # update records accordingly
-    print(userFollowing)
-    print(userFollowingDemocrats)
-    print(userFollowingRepublicans)
-    print(polticalAffiliation)
+    #print(userFollowing)
+    #print(userFollowingDemocrats)
+    #print(userFollowingRepublicans)
+    #print(polticalAffiliation)
     cursor = connection.cursor()
     # for idx, userID in enumerate(userFollowing):
     #     data = (polticalAffiliation.get(userID), userFollowingDemocrats.get(userID), userFollowingRepublicans.get(userID), len(userFollowing.get(userID)), userID)
