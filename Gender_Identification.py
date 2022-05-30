@@ -107,9 +107,9 @@ def identify_gender(db_connection):
         for name in names:
             name = name.lower()
             if name in not_names:
-                continue
+                data.append((-1, int(users_df.iloc[index]["id"])))
             if len(name) < 3:
-                continue
+                data.append((-1, int(users_df.iloc[index]["id"])))
             if name in gendered_names:
                 # print(users_df.iloc[index]["id"])
                 result[user["username"]] = gendered_names[name]
@@ -122,8 +122,10 @@ def identify_gender(db_connection):
                 # print("Identified by Name")
             elif preprocessed_users.iloc[index]["gender"] == -1:
                 url = user["profile_picture_url"]
-                if url == "null":
+                if url is None:
                     data.append((0, int(users_df.iloc[index]["id"])))
+                else:
+                    url = user["profile_picture_url"].replace("_normal", "")
                 query_string = "UPDATE users_pre_processed SET gender=%s WHERE id=%s"
 
                 data.append((classify_gender_by_pic(url), int(users_df.iloc[index]["id"])))
