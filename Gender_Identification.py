@@ -81,7 +81,7 @@ def get_classified_names():
 
 def get_users(db_connection):
     return pd.read_sql_query(
-        "SELECT DISTINCT users.id, users.username, users.name, users.profile_picture_url FROM users INNER JOIN tweets t on users.id = t.author_id WHERE (SELECT user_gender FROM data_preprocessed WHERE data_preprocessed.tweet_id = t.id) IS NULL OR (SELECT user_gender FROM data_preprocessed WHERE data_preprocessed.tweet_id = t.id) = -1;",
+        "SELECT DISTINCT users.id, users.username, users.name, users.profile_picture_url FROM users INNER JOIN tweets t on users.id = t.author_id WHERE (SELECT gender FROM users_pre_processed WHERE users_pre_processed.user_id = t.author_id) = -1;",
         db_connection)
 
 
@@ -115,15 +115,15 @@ def identify_gender(db_connection):
                 result[user["username"]] = gendered_names[name]
                 indexes.append(users_df.iloc[index]["id"])
                 if result[user["username"]] == "M":
-                    gender_code = "1"
+                    gender_code = 1
                 else:
-                    gender_code = "2"
+                    gender_code = 2
                 data.append((gender_code, int(users_df.iloc[index]["id"])))
                 # print("Identified by Name")
             elif preprocessed_users.iloc[index]["gender"] == -1:
                 url = user["profile_picture_url"]
                 if url == "null":
-                    continue
+                    data.append((0, int(users_df.iloc[index]["id"])))
                 query_string = "UPDATE users_pre_processed SET gender=%s WHERE id=%s"
 
                 data.append((classify_gender_by_pic(url), int(users_df.iloc[index]["id"])))
@@ -131,7 +131,7 @@ def identify_gender(db_connection):
                 # print("Identified by Picture")
             else:
                 # print("Cant identify")
-                data.append(("0", int(users_df.iloc[index]["id"])))
+                data.append((0, int(users_df.iloc[index]["id"])))
 
         # print("Processed {} of {}".format(count, len(users_df)))
     query_string = "UPDATE users_pre_processed SET gender=%s WHERE id=%s AND gender < 0"
@@ -156,19 +156,20 @@ def classify_gender_by_pic(picture_url):
             if result["face_detection"]["results"]:
                 if len(result["face_detection"]["results"]) > 0:
                     if result["face_detection"]["results"][0]["gender"]["decision"] == "male":
-                        return "1"
+                        return 1
                     elif result["face_detection"]["results"][0]["gender"]["decision"] == "female":
-                        return "2"
+                        return 2
                     else:
-                        return "0"
+                        return 0
                 else:
-                    return "0"
+                    return 0
             else:
-                return "0"
+                return 0
         elif result["status"] == "failure":
             if result["error"]["errorCode"] == 11:
                 api_key_index += 1
-            return "-1"
+                return -1
+            return 0
 
     except Error as error:
         print(error)
