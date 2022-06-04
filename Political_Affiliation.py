@@ -1,3 +1,5 @@
+import time
+
 import mysql.connector
 from mysql.connector import Error
 from tqdm import tqdm
@@ -10,29 +12,25 @@ def fillDataUser(cursor):
 
     # depending on the size of the table needs to change
     cursor = connection.cursor()
-    cursor.execute("select id from users WHERE id NOT IN (SELECT id from users_pre_processed);")
+    cursor.execute("SELECT id FROM users WHERE id NOT IN (SELECT id from users_pre_processed);")
     # where
     record = cursor.fetchall()
 
-    # go through all the rows of the user table
-    # for row in record:
-    #     # get only the twitteruserid
-    #     userID = str(row).strip('(),')
-    #     # check if the user from the users table is in the users_pre_processed table
-    #     cursor.execute(sql_checkQuery, [userID])
-    #     userIDdb = cursor.fetchall()
-    #     if (len(userIDdb) > 0):
-    #         print('already processed user: ' + str(userID))
-    #         continue
-    #     else:
-    #         data = (str(row).strip('(),'), str(row).strip('(),'), -1, -1, -1, -1, -1)
-    #         cursor.execute(sql_baseQuery, data)
+    # NEXT IDEA -> Fetch always 100k and fill table with values the below
+
+    if(len(record) >= 30000):
+        counter = [i for i in range(0, len(record), 30000)]
+        counter.append(len(record))
+    else:
+        counter = []
+        counter.append(0)
+        counter.append(len(record))
 
 
-    #userID = [str(row).strip('(),') for row in record]
-    #cursor.executemany(sql_checkQuery, userID)
-    data = [(str(row).strip('(),'), str(row).strip('(),'), -1, -1, -1, -1, -1) for row in record]
-    cursor.executemany(sql_baseQuery, data)
+    for pos, element in tqdm(enumerate(counter), desc='filling missing values'):
+        if (pos+1 < len(counter)):
+            data = [(str(record[row]).strip('(),'), str(record[row]).strip('(),'), -1, -1, -1, -1, -1) for row in range(element, counter[pos + 1])]
+            cursor.executemany(sql_baseQuery, data)
 
     connection.commit()
 
@@ -148,6 +146,25 @@ def getFollowersAffiliation(cursor):
 
     data = [(polticalAffiliation.get(userID), userFollowingDemocrats.get(userID), userFollowingRepublicans.get(userID), len(userFollowing.get(userID)), userID) for userID in userFollowing]
     cursor.executemany(sql_updateQuery, data)
+
+    if (len(userFollowing) >= 30000):
+        counter = [i for i in range(0, len(userFollowing), 30000)]
+        counter.append(len(userFollowing))
+    else:
+        counter = []
+        counter.append(0)
+        counter.append(len(userFollowing))
+
+
+    userIDs = list(userFollowing)
+
+    for pos, element in tqdm(enumerate(counter), desc='filling missing values'):
+        if (pos + 1 < len(counter)):
+            data = [(polticalAffiliation.get(userIDs[userID]), userFollowingDemocrats.get(userIDs[userID]), userFollowingRepublicans.get(userIDs[userID]), len(userFollowing.get(userIDs[userID])), userIDs[userID]) for userID in
+                    range(element, counter[pos + 1])]
+            cursor.executemany(sql_updateQuery, data)
+
+
     connection.commit()
 
 
