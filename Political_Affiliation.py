@@ -7,12 +7,12 @@ from tqdm import tqdm
 
 # fills up values only for users wh     o are not yet in the DB
 def fillDataUser(cursor):
-    sql_baseQuery = """INSERT INTO users_pre_processed VALUES (%s, %s, %s, %s, %s, %s, %s)"""
-    #sql_checkQuery = """select id from users_pre_processed WHERE id = %s"""
+    sql_baseQuery = """INSERT INTO users_pre_processed_v2 VALUES (%s, %s, %s, %s, %s, %s, %s)"""
+    #sql_checkQuery = """select id from users_pre_processed_v2 WHERE id = %s"""
 
     # depending on the size of the table needs to change
     cursor = connection.cursor()
-    cursor.execute("SELECT id FROM users WHERE id NOT IN (SELECT id from users_pre_processed);")
+    cursor.execute("SELECT id FROM users WHERE id NOT IN (SELECT id from users_pre_processed_v2);")
     # where
     record = cursor.fetchall()
 
@@ -28,7 +28,7 @@ def fillDataUser(cursor):
 
 
     for pos, element in tqdm(enumerate(counter), desc='filling missing values'):
-        if (pos+1 < len(counter)):
+        if pos+1 < len(counter):
             data = [(str(record[row]).strip('(),'), str(record[row]).strip('(),'), -1, -1, -1, -1, -1) for row in range(element, counter[pos + 1])]
             cursor.executemany(sql_baseQuery, data)
 
@@ -38,7 +38,7 @@ def fillDataUser(cursor):
 def getFollowersAffiliation(cursor):
     cursor = connection.cursor()
     # TODO: change to cursor.execute("select user_id,following_id from user_following;")
-    cursor.execute("select user_id,following_id from user_following;")
+    cursor.execute("select user_id,following_id from user_following inner join users on following_id = users.id inner join politicians on users.username = politicians.username;")
     # depending on the size of the table needs to change
     record = cursor.fetchall()
 
@@ -66,7 +66,7 @@ def getFollowersAffiliation(cursor):
 
     # add followers of a userID to a list. The key being a specific twitter userID
     # only process twitter users which are not yet processed (i.e. have -1 in the political affiliation column)
-    sql_checkQuery = """select id from users_pre_processed WHERE id = %s AND political_affiliation != -1"""
+    sql_checkQuery = """select id from users_pre_processed_v2 WHERE id = %s AND political_affiliation != -1"""
 
 
     for row in tqdm(record, desc='Find following twitter user'):
@@ -74,7 +74,7 @@ def getFollowersAffiliation(cursor):
         if userFollowing.get(row[0]) is not None:
             cursor.execute(sql_checkQuery, [row[0]])
             userIDdb = cursor.fetchall()
-            if (len(userIDdb) > 0):
+            if len(userIDdb) > 0:
                 #print('already processed user: ' + str(row[0]))
                 continue
             else:
@@ -100,33 +100,33 @@ def getFollowersAffiliation(cursor):
     for userID in tqdm(userFollowing, desc='Counting individual party'):
         for followingID in userFollowing[userID]:
             if str(followingID) in politicianDataset:
-                if (politicianDataset[str(followingID)] == "Democratic Party"):
+                if "dem" in politicianDataset[str(followingID)].lower():
                     userFollowingDemocrats[userID] += 1
-                elif (politicianDataset[str(followingID)] == "Republican Party"):
+                elif "rep" in politicianDataset[str(followingID)].lower():
                     userFollowingRepublicans[userID] += 1
                 else:
                     continue
             else:
                 continue
 
-    sql_updateQuery = """UPDATE users_pre_processed SET political_affiliation = %s, democrat_following = %s, republican_following = %s, following_base = %s WHERE id = %s"""
+    sql_updateQuery = """UPDATE users_pre_processed_v2 SET political_affiliation = %s, democrat_following = %s, republican_following = %s, following_base = %s WHERE id = %s"""
 
     for userID in tqdm(userFollowing, desc='Political definition function'):
         democrats = userFollowingDemocrats.get(userID)
         republicans = userFollowingRepublicans.get(userID)
         # Do concrete affiliation calculation and define baseline 0.6
         # there can't be a devision by 0 error
-        if ((democrats + republicans) < 5):
+        if (democrats + republicans) < 5:
             polticalAffiliation[userID] = 0
             continue
-        elif (democrats > republicans):
-            if ((democrats) / (democrats + republicans) >= 0.6):
+        elif democrats > republicans:
+            if (democrats) / (democrats + republicans) >= 0.6:
                 polticalAffiliation[userID] = 1
             else:
                 polticalAffiliation[userID] = 0
             continue
-        elif (republicans > democrats):
-            if ((republicans) / (democrats + republicans) >= 0.6):
+        elif republicans > democrats:
+            if republicans / (democrats + republicans) >= 0.6:
                 polticalAffiliation[userID] = 2
             else:
                 polticalAffiliation[userID] = 0
@@ -180,7 +180,7 @@ if __name__ == "__main__":
             db_Info = connection.get_server_info()
             print("Connected to MySQL Server version ", db_Info)
             cursor = connection.cursor()
-            cursor.execute('''CREATE TABLE IF NOT EXISTS users_pre_processed (
+            cursor.execute('''CREATE TABLE IF NOT EXISTS users_pre_processed_v2 (
                                    id BIGINT PRIMARY KEY,
                                    user_id BIGINT,
                                    gender INTEGER,
