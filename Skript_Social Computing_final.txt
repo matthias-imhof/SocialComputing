@@ -1,0 +1,264 @@
+#install.packages("odbc")
+#install.packages("RMySQL")
+#install.packages("RODBC")
+#install.packages('RPostgreSQL')
+#install.packages('RPostgres')
+
+library("RMySQL")
+library("RODBC")
+library("ggplot2")
+library("psych")
+library("RMySQL")
+library("DBI")
+library("RPostgres")
+
+
+con <- dbConnect(RPostgres::Postgres(),
+                 user = 'postgres',
+                 password = 'Pizza1234',
+                 host = 's1.lgh.li',
+                 dbname = 'postgres')
+
+
+users_pre_processed_final <- dbGetQuery(con, "select * from data_preprocessed_final")
+users_pre_processed_KONTROLL <- subset(users_pre_processed_final, users_pre_processed_final$political_affiliation==-1)
+
+dbDisconnect(con)
+
+
+
+#Stichprobengrösse Democrats (männlich/weiblich) / Republicans(männlich/weiblich)?
+#DESKRIPTIVE STATISTIK TWEETS & USER:
+
+#--------ANZAHL TWEETS--------------
+#Anzahl Tweets insgesamt
+nrow(users_pre_processed_final)
+Tweets_Total <- nrow(users_pre_processed_final)
+#Anzahl Tweets democrats (=1) insgesamt
+Tweets_Demokraten <- nrow(subset(users_pre_processed_final, political_affiliation=="1"))
+Tweets_Demokraten
+#Anzahl Tweets republicans (=2) insgesamt
+Tweets_Republikaner <- nrow(subset(users_pre_processed_final, political_affiliation=="2"))
+Tweets_Republikaner
+#Anzahl Tweets undefined (=0) insgesamt
+Tweets_Undefiniert_pol <- nrow(subset(users_pre_processed_final, political_affiliation=="0"))
+Tweets_Undefiniert_pol
+#Anzahl Tweets Frauen (=2) insgesamt
+Tweets_female <- nrow(subset(users_pre_processed_final, user_gender=="2"))
+Tweets_Frauen
+#Anzahl Tweets Männer (=1) insgesamt
+Tweets_Männer <- nrow(subset(users_pre_processed_final, user_gender=="1"))
+Tweets_Männer
+#Anzahl Tweets undefined (=0) insgesamt
+Tweets_Undefiniert_geschlecht<- nrow(subset(users_pre_processed_final, user_gender=="0"))
+Tweets_Undefiniert_geschlecht
+
+#--------KREISDIAGRAMME TWEETS--------------
+#1 Kreisdiagramm Tweets insgesamt \n inkl. undefined
+slices <- c(Tweets_Demokraten, Tweets_Republikaner, Tweets_Undefiniert_pol)
+lbls <- c("democrats", "republicans", "undefined")
+lbls <- paste(lbls, sprintf("(%d)", slices))
+colors <- c("blue","red","grey")
+pie(slices, labels=lbls, col=colors, cex=0.7, main="Tweets by political affiliation,\n incl. undefined")
+pie(slices[c(1,2)], labels=lbls[c(1,2)], col=colors[c(1,2)], cex=0.7, main="Tweets by political affiliation")
+
+#2 Kreisdiagramm Tweets nach Geschlecht (inkl. undefined)
+slices <- c(Tweets_Frauen, Tweets_Männer, Tweets_Undefiniert_geschlecht)
+lbls <- c("female", "male", "undefined")
+lbls <- paste(lbls, sprintf("(%d)", slices))
+colors <- c("purple","yellow","grey")
+pie(slices, labels=lbls, col=colors, cex=0.7, main="Tweets by gender, \n incl. undefined")
+
+#3 Kreisdiagramm Tweets nach Geschlecht (exkl. undefined)
+#PLOT WEIBLICH / MÄNNLICH EXL. UNDEFINED
+pie(slices[c(1,2)], labels=lbls[c(1,2)], col=colors[c(1,2)], cex=0.7, main="Tweets by gender")
+
+#Wieviele weiblich/männlich unter den Republicans?
+rep_weiblich_anzahl <- nrow(subset(users_pre_processed_final, user_gender=="2" & political_affiliation=="2"))
+rep_maennlich_anzahl <- nrow(subset(users_pre_processed_final, user_gender=="1" & political_affiliation=="2"))
+
+rep_weiblich_anzahl
+rep_maennlich_anzahl
+
+#Wieviele weiblich/männlich unter den Democrats?
+dem_weiblich_anzahl <- nrow(subset(users_pre_processed_final, user_gender=="2" & political_affiliation=="1"))
+dem_maennlich_anzahl <- nrow(subset(users_pre_processed_final, user_gender=="1" & political_affiliation=="1"))
+dem_weiblich_anzahl
+dem_maennlich_anzahl
+
+#PLOT Verteilung Geschlecht nach Politischer Zugehörigkeit
+colors = c("pink", "cyan")
+pol_aff <- c("Democrats","Republicans")
+gender <- c("female","male")
+Values <- matrix(c(dem_maennlich_anzahl,rep_maennlich_anzahl,
+                   dem_weiblich_anzahl,rep_weiblich_anzahl), nrow = 2, ncol = 2, byrow = TRUE)
+png(file = "barchart_stacked.png")
+barplot(Values, main = "Distribution of gender \n according to political affiliation", names.arg = pol_aff, xlab = "political affiliation", ylab = "counts", col = colors)
+legend("topright", gender, cex = 0.8, fill = colors)
+
+text(x=0.7,y=10, sprintf("%s",dem_weiblich_anzahl), cex=1, col="black")
+text(x=0.7,y=30, sprintf("%s",dem_maennlich_anzahl), cex=1, col="black")
+
+text(x=1.9,y=6, sprintf("%s",rep_weiblich_anzahl), cex=1, col="black")
+text(x=1.9,y=16, sprintf("%s",rep_maennlich_anzahl), cex=1, col="black")
+
+#DESKRIPTIVE STATISTIK LIKES / QUOTES / REPLY / RETWEETS:
+
+#Likes Pro Tweets
+min(users_pre_processed_final$tweet_metrics_like_count)
+max(users_pre_processed_final$tweet_metrics_like_count)
+mean(users_pre_processed_final$tweet_metrics_like_count)
+median(users_pre_processed_final$tweet_metrics_like_count)
+
+#Quotes Pro Tweets
+min(users_pre_processed_final$tweet_metrics_quote_count)
+max(users_pre_processed_final$tweet_metrics_quote_count)
+mean(users_pre_processed_final$tweet_metrics_quote_count)
+median(users_pre_processed_final$tweet_metrics_quote_count)
+
+#Reply Pro Tweets
+min(users_pre_processed_final$tweet_metrics_reply_count)
+max(users_pre_processed_final$tweet_metrics_reply_count)
+mean(users_pre_processed_final$tweet_metrics_reply_count)
+median(users_pre_processed_final$tweet_metrics_reply_count)              
+
+#Retweets Pro Tweets
+min(users_pre_processed_final$tweet_metrics_retweet_count)
+max(users_pre_processed_final$tweet_metrics_retweet_count)
+mean(users_pre_processed_final$tweet_metrics_retweet_count)
+median(users_pre_processed_final$tweet_metrics_retweet_count)
+
+#HISTOGRAMM ANZAHL TWEETS
+subset_DemRep_LikesNichtNull <- subset(users_pre_processed_final, (users_pre_processed_final$political_affiliation==2 | users_pre_processed_final$political_affiliation==1) & (users_pre_processed_final$tweet_metrics_like_count<10))
+ggplot(subset_DemRep_LikesNichtNull, aes(x = tweet_metrics_like_count)) +
+  geom_histogram(binwidth = 1, color = "white", fill="steelblue") +
+  labs(x="Anzahl Likes", y="Häufigkeit") +
+  ggtitle("Histogramm Anzahl Likes") +
+  theme(plot.title=element_text(hjust=0.5)) +
+  scale_x_continuous(breaks=seq(0.0 ,10.0, 1.0))
+
+#Dataframe Anzahl
+table(users_pre_processed_final$tweet_metrics_like_count)
+
+plot(users_pre_processed_final$tweet_metrics_like_count,
+     main = 'Zusammenhang zwischen Age und N1',
+     xlab = 'Anzahhl Likes',
+     ylab = 'Häufigkeiten')
+
+
+#Normalverteilung
+
+SubsetNormalverteilung <- users_pre_processed_final[sample(1:nrow(users_pre_processed_final), 5000,
+                          replace=FALSE),]
+
+shapiro.test(SubsetNormalverteilung$tweet_metrics_like_count)
+shapiro.test(SubsetNormalverteilung$tweet_metrics_reply_count)
+shapiro.test(SubsetNormalverteilung$tweet_metrics_quote_count)
+shapiro.test(SubsetNormalverteilung$tweet_metrics_retweet_count)
+
+
+
+#KRUSKAL WALLIS: Weil mehrere samples (m,w,undefined), nicht normalverteilt(unparametrisch), unabhängige Stichproben
+#H01: Nullhypothese Demokrat LIKES: Kein unterschied in der Reaktion Mann und Frau (ohne Nuller-Posts)
+subset_demokraten_LikesNichtNull <- subset(users_pre_processed_final, users_pre_processed_final$political_affiliation==1 & users_pre_processed_final$tweet_metrics_like_count!=0)
+kruskal.test(subset_demokraten_LikesNichtNull$tweet_metrics_like_count~subset_demokraten_LikesNichtNull$user_gender)
+#H02: Nullhypothese Demokrat QUOTES: Kein unterschied in der Reaktion Mann und Frau (ohne Nuller-Posts)
+subset_QuotesNichtNull <- subset(users_pre_processed_final, users_pre_processed_final$political_affiliation==1 & users_pre_processed_final$tweet_metrics_quote_count!=0)
+kruskal.test(subset_QuotesNichtNull$tweet_metrics_quote_count~subset_QuotesNichtNull$user_gender)
+##H03 Nullhypothese Demokrat REPLIES: Kein unterschied in der Reaktion Mann und Frau (ohne Nuller-Posts)
+subset_RepliesNichtNull <- subset(users_pre_processed_final, users_pre_processed_final$political_affiliation==1 & users_pre_processed_final$tweet_metrics_reply_count!=0)
+kruskal.test(subset_RepliesNichtNull$tweet_metrics_reply_count~subset_RepliesNichtNull$user_gender)
+#Nullhypothese Demokrat RETWEETS: Kein unterschied in der Reaktion Mann und Frau (ohne Nuller-Posts)
+subset_RetwetsNichtNull <- subset(users_pre_processed_final, users_pre_processed_final$political_affiliation==1 & users_pre_processed_final$tweet_metrics_retweet_count!=0)
+kruskal.test(subset_RetwetsNichtNull$tweet_metrics_reply_count~subset_RetwetsNichtNull$user_gender)
+
+#Nullhypothese Republikaner: Kein unterschied in der Reaktion Mann und Frau
+#KRUSKAL WALLIS: Weil mehrere samples (m,w,undefined), nicht normalverteilt(unparametrisch), unabhängige Stichproben
+#Nullhypothese Republikaner LIKES: Kein unterschied in der Reaktion Mann und Frau (ohne Nuller-Posts)
+subset_republikaner_LikesNichtNull <- subset(users_pre_processed_final, users_pre_processed_final$political_affiliation==2 & users_pre_processed_final$tweet_metrics_like_count!=0)
+kruskal.test(subset_republikaner_LikesNichtNull$tweet_metrics_like_count~subset_republikaner_LikesNichtNull$user_gender)
+#Nullhypothese Republikaner QUOTES: Kein unterschied in der Reaktion Mann und Frau (ohne Nuller-Posts)
+subset_republikaner_QuotesNichtNull <- subset(users_pre_processed_final, users_pre_processed_final$political_affiliation==2 & users_pre_processed_final$tweet_metrics_quote_count!=0)
+kruskal.test(subset_republikaner_QuotesNichtNull$tweet_metrics_quote_count~subset_republikaner_QuotesNichtNull$user_gender)
+#Nullhypothese Republikaner REPLIES: Kein unterschied in der Reaktion Mann und Frau (ohne Nuller-Posts)
+subset_republikaner_RepliesNichtNull <- subset(users_pre_processed_final, users_pre_processed_final$political_affiliation==2 & users_pre_processed_final$tweet_metrics_reply_count!=0)
+kruskal.test(subset_republikaner_RepliesNichtNull$tweet_metrics_reply_count~subset_republikaner_RepliesNichtNull$user_gender)
+#Nullhypothese Republikaner RETWEETS: Kein unterschied in der Reaktion Mann und Frau (ohne Nuller-Posts)
+subset_republikaner_RetwetsNichtNull <- subset(users_pre_processed_final, users_pre_processed_final$political_affiliation==2 & users_pre_processed_final$tweet_metrics_retweet_count!=0)
+kruskal.test(subset_republikaner_RetwetsNichtNull$tweet_metrics_reply_count~subset_republikaner_RetwetsNichtNull$user_gender)
+
+#____________________kontollgruppe__________________________________
+#--------ANZAHL TWEETS--------------
+#Anzahl Tweets insgesamt
+nrow(users_pre_processed_KONTROLL)
+Tweets_Total <- nrow(users_pre_processed_KONTROLL)
+#Anzahl Tweets Frauen (=2) insgesamt
+Tweets_female <- nrow(subset(users_pre_processed_KONTROLL, user_gender=="2"))
+Tweets_Frauen
+#Anzahl Tweets Männer (=1) insgesamt
+Tweets_Männer <- nrow(subset(users_pre_processed_KONTROLL, user_gender=="1"))
+Tweets_Männer
+#Anzahl Tweets undefined (=0) insgesamt
+Tweets_Undefiniert_geschlecht<- nrow(subset(users_pre_processed_KONTROLL, user_gender=="0"))
+Tweets_Undefiniert_geschlecht
+
+#--------KREISDIAGRAMME TWEETS--------------
+
+#2 Kreisdiagramm Tweets nach Geschlecht (inkl. undefined)
+slices <- c(Tweets_Frauen, Tweets_Männer, Tweets_Undefiniert_geschlecht)
+lbls <- c("female", "male", "undefined")
+lbls <- paste(lbls, sprintf("(%d)", slices))
+colors <- c("purple","yellow","grey")
+pie(slices, labels=lbls, col=colors, cex=0.7, main="Tweets by gender, \n incl. undefined")
+
+#3 Kreisdiagramm Tweets nach Geschlecht (exkl. undefined)
+#PLOT WEIBLICH / MÄNNLICH EXL. UNDEFINED
+pie(slices[c(1,2)], labels=lbls[c(1,2)], col=colors[c(1,2)], cex=0.7, main="Tweets by gender")
+
+#Likes Pro Tweets
+min(users_pre_processed_KONTROLL$tweet_metrics_like_count)
+max(users_pre_processed_KONTROLL$tweet_metrics_like_count)
+mean(users_pre_processed_KONTROLL$tweet_metrics_like_count)
+median(users_pre_processed_KONTROLL$tweet_metrics_like_count)
+
+#Quotes Pro Tweets
+min(users_pre_processed_KONTROLL$tweet_metrics_quote_count)
+max(users_pre_processed_KONTROLL$tweet_metrics_quote_count)
+mean(users_pre_processed_KONTROLL$tweet_metrics_quote_count)
+median(users_pre_processed_KONTROLL$tweet_metrics_quote_count)
+
+#Reply Pro Tweets
+min(users_pre_processed_KONTROLL$tweet_metrics_reply_count)
+max(users_pre_processed_KONTROLL$tweet_metrics_reply_count)
+mean(users_pre_processed_KONTROLL$tweet_metrics_reply_count)
+median(users_pre_processed_KONTROLL$tweet_metrics_reply_count)              
+
+#Retweets Pro Tweets
+min(users_pre_processed_KONTROLL$tweet_metrics_retweet_count)
+max(users_pre_processed_KONTROLL$tweet_metrics_retweet_count)
+mean(users_pre_processed_KONTROLL$tweet_metrics_retweet_count)
+median(users_pre_processed_KONTROLL$tweet_metrics_retweet_count)
+
+
+
+#Normalverteilung
+shapiro.test(users_pre_processed_KONTROLL$tweet_metrics_like_count)
+shapiro.test(users_pre_processed_KONTROLL$tweet_metrics_reply_count)
+shapiro.test(users_pre_processed_KONTROLL$tweet_metrics_quote_count)
+shapiro.test(users_pre_processed_KONTROLL$tweet_metrics_retweet_count)
+
+
+
+#KRUSKAL WALLIS: Weil mehrere samples (m,w,undefined), nicht normalverteilt(unparametrisch), unabhängige Stichproben
+#H01: Nullhypothese LIKES: Kein unterschied in der Reaktion Mann und Frau (ohne Nuller-Posts)
+subset_LikesNichtNull <- subset(users_pre_processed_KONTROLL, users_pre_processed_KONTROLL$tweet_metrics_like_count!=0)
+kruskal.test(subset_LikesNichtNull$tweet_metrics_like_count~subset_LikesNichtNull$user_gender)
+#H02: Nullhypothese QUOTES: Kein unterschied in der Reaktion Mann und Frau (ohne Nuller-Posts)
+subset_QuotesNichtNull <- subset(users_pre_processed_KONTROLL, users_pre_processed_KONTROLL$tweet_metrics_quote_count!=0)
+kruskal.test(subset_QuotesNichtNull$tweet_metrics_quote_count~subset_QuotesNichtNull$user_gender)
+##H03 Nullhypothese REPLIES: Kein unterschied in der Reaktion Mann und Frau (ohne Nuller-Posts)
+subset_RepliesNichtNull <- subset(users_pre_processed_KONTROLL, users_pre_processed_KONTROLL$tweet_metrics_reply_count!=0)
+kruskal.test(subset_RepliesNichtNull$tweet_metrics_reply_count~subset_RepliesNichtNull$user_gender)
+#Nullhypothese RETWEETS: Kein unterschied in der Reaktion Mann und Frau (ohne Nuller-Posts)
+subset_RetwetsNichtNull <- subset(users_pre_processed_KONTROLL, users_pre_processed_KONTROLL$tweet_metrics_retweet_count!=0)
+kruskal.test(subset_RetwetsNichtNull$tweet_metrics_reply_count~subset_RetwetsNichtNull$user_gender)
